@@ -23,8 +23,9 @@ matrix:
 
 install:
   - pip install -q Flask==$FLASK_VERSION
+  - pip install -q Babel>=2.3
   - pip install -q pep8 pyflakes
-  - pip install -q .
+  - pip install .
 
 before_script:
   - pep8 flask_xuanzang

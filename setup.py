@@ -18,6 +18,7 @@ setup(
     packages=['flask_xuanzang'],
     install_requires=[
         'Flask>=0.9',
+        'Babel>=2.3',
     ],
     test_suite='nose.collector',
     tests_require=['nose'],
