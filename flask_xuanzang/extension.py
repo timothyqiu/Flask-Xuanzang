@@ -14,6 +14,27 @@ class ShoshinMixin(object):
     def get_translations(self):
         raise NotImplementedError()
 
+    def gettext(self, message, **variables):
+        t = self.get_translations()
+        s = t.gettext(message)
+        return s if not variables else s % variables
+
+    def ngettext(self, singular, plural, num, **variables):
+        variables.setdefault('num', num)
+        t = self.get_translations()
+        s = t.ngettext(singular, plural, num)
+        return s if not variables else s % variables
+
+    def pgettext(self, context, message, **variables):
+        t = self.get_translations()
+        s = t.upgettext(context, message)
+        return s if not variables else s % variables
+
+    def npgettext(self, context, singular, plural, num, **variables):
+        t = self.get_translations()
+        s = t.unpgettext(context, singular, plural, num)
+        return s if not variables else s % variables
+
     def ugettext(self, message, **variables):
         t = self.get_translations()
         s = t.ugettext(message)
@@ -37,7 +58,9 @@ class Attan(ShoshinMixin):
     def get_translations(self):
         directory = self.translation_directory
         locales = [self.get_locale()]
-        return Translations.load(directory, locales)
+        translations = Translations.load(directory, locales)
+        translations.set_output_charset('utf-8')
+        return translations
 
 
 class Xuanzang(ShoshinMixin):
@@ -73,11 +96,40 @@ class Xuanzang(ShoshinMixin):
         return self.get_attan().get_translations()
 
 
-def ugettext(message, **variables):
+def _do_translation(function_name, *args, **kwargs):
     attan = Xuanzang.get_attan()
-    return attan.ugettext(message, **variables)
+    return getattr(attan, function_name)(*args, **kwargs)
+
+
+def gettext(message, **variables):
+    '''Returns a string of the translation of the message.
+
+    :returns: a string on Python 3 and an UTF-8-encoded bytestring on Python 2
+    '''
+    return _do_translation('gettext', message, **variables)
+
+
+def ngettext(singular, plural, num, **variables):
+    '''Returns a string of the translation of the singular or plural based on
+    the number.
+
+    :returns: a string on Python 3 and an UTF-8-encoded bytestring on Python 2
+    '''
+    return _do_translation('ngettext', singular, plural, num, **variables)
+
+
+def pgettext(context, message, **variables):
+    return _do_translation('pgettext', context, message, **variables)
+
+
+def npgettext(context, singular, plural, num, **variables):
+    return _do_translation('npgettext',
+                           context, singular, plural, num, **variables)
+
+
+def ugettext(message, **variables):
+    return _do_translation('ugettext', message, **variables)
 
 
 def ungettext(singular, plural, num, **variables):
-    attan = Xuanzang.get_attan()
-    return attan.ungettext(singular, plural, num, **variables)
+    return _do_translation('ungettext', singular, plural, num, **variables)
