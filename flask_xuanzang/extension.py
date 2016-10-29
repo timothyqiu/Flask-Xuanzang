@@ -48,12 +48,19 @@ class ShoshinMixin(object):
 
 
 class Attan(ShoshinMixin):
-    def __init__(self, translation_directory, default_locale):
+    def __init__(self, translation_directory,
+                 default_locale, locale_selector):
         self.translation_directory = translation_directory
         self.default_locale = Locale.parse(default_locale)
+        self.locale_selector = locale_selector
 
     def get_locale(self):
-        return self.default_locale
+        if not self.locale_selector:
+            return self.default_locale
+        raw_locale = self.locale_selector()
+        if raw_locale is None:
+            return self.default_locale
+        return Locale.parse(raw_locale)
 
     def get_translations(self):
         directory = self.translation_directory
@@ -66,15 +73,20 @@ class Attan(ShoshinMixin):
 class Xuanzang(ShoshinMixin):
     EXTENSION_KEY = 'xuanzang'
 
-    def __init__(self, app=None):
+    def __init__(self, app=None, locale_selector=None):
+        self.locale_selector = locale_selector
+
         if app:
-            self.init_app(app)
+            self.init_app(app, locale_selector=locale_selector)
 
-    def init_app(self, app):
+    def init_app(self, app, locale_selector=None):
+        locale_selector = locale_selector or self.locale_selector
+        attan = self.init_attan(app, locale_selector)
+
         app.extensions = getattr(app, 'extensions', {})
-        app.extensions[self.EXTENSION_KEY] = self.init_attan(app)
+        app.extensions[self.EXTENSION_KEY] = attan
 
-    def init_attan(self, app):
+    def init_attan(self, app, locale_selector):
         directory = app.config.get('XUANZANG_TRANSLATION_DIRECTORY',
                                    'translations')
         if not os.path.isabs(directory):
@@ -83,6 +95,7 @@ class Xuanzang(ShoshinMixin):
         return Attan(
             directory,
             app.config.get('XUANZANG_DEFAULT_LOCALE', 'en'),
+            locale_selector,
         )
 
     @classmethod

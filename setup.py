@@ -21,7 +21,10 @@ setup(
         'Babel>=2.3',
     ],
     test_suite='nose.collector',
-    tests_require=['nose'],
+    tests_require=[
+        'nose',
+        'mock',
+    ],
     zip_safe=False,
     classifiers=[
         'Development Status :: 4 - Beta',

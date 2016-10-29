@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from flask import Flask
+from mock import Mock
 
 from flask_xuanzang import Xuanzang
 from flask_xuanzang import gettext, ngettext
@@ -19,17 +20,17 @@ PY2 = (sys.version_info[0] == 2)
 
 class XuanzangTestCase(unittest.TestCase):
     def setUp(self):
-        subprocess.check_call(['pybabel', 'compile', '-d',
+        subprocess.check_call(['pybabel', '-q', 'compile', '-d',
                                os.path.join('tests', 'translations')])
 
 
 class SingleAppTestCase(XuanzangTestCase):
-    def setUp(self):
+    def setUp(self, default_locale='de', locale_selector=None):
         super(SingleAppTestCase, self).setUp()
 
         self.app = Flask(__name__)
-        self.app.config['XUANZANG_DEFAULT_LOCALE'] = 'de'
-        self.xuanzang = Xuanzang(self.app)
+        self.app.config['XUANZANG_DEFAULT_LOCALE'] = default_locale
+        self.xuanzang = Xuanzang(self.app, locale_selector=locale_selector)
 
 
 class GettextTestCase(SingleAppTestCase):
@@ -79,10 +80,41 @@ class GettextTestCase(SingleAppTestCase):
             self.assertEqual(plural, 'Äpfel')
 
 
+class LocaleSelectorTestCase(SingleAppTestCase):
+    def setUp(self):
+        self.locale_selector = Mock(name='locale_selector')
+        super(LocaleSelectorTestCase, self).setUp(
+            default_locale='de',
+            locale_selector=self.locale_selector)
+
+    def test_return_none(self):
+        self.locale_selector.return_value = None
+        with self.app.test_request_context():
+            self.assertEqual(ugettext('Large'), 'Groß')
+            self.locale_selector.assert_any_call()
+
+    def test_return_locale(self):
+        self.locale_selector.return_value = 'zh_CN'
+        with self.app.test_request_context():
+            self.assertEqual(ugettext('Large'), '大型')
+            self.locale_selector.assert_any_call()
+
+
 class MethodTestCase(SingleAppTestCase):
+    def setUp(self):
+        self.locale_selector = Mock(name='locale_selector')
+        super(MethodTestCase, self).setUp(locale_selector=self.locale_selector)
+
     def test_gettext(self):
+        self.locale_selector.return_value = None
         with self.app.test_request_context():
             self.assertEqual(self.xuanzang.ugettext('Large'), 'Groß')
+
+    def test_locale_selector(self):
+        self.locale_selector.return_value = 'zh_CN'
+        with self.app.test_request_context():
+            self.assertEqual(self.xuanzang.ugettext('Large'), '大型')
+            self.locale_selector.assert_any_call()
 
 
 class MultipleAppsTestCase(XuanzangTestCase):
@@ -93,19 +125,38 @@ class MultipleAppsTestCase(XuanzangTestCase):
 
         self.app_a = Flask(__name__)
         self.app_a.config['XUANZANG_DEFAULT_LOCALE'] = 'en'
-        self.xuanzang.init_app(self.app_a)
+        self.locale_selector_a = Mock(name='locale_selector_a',
+                                      return_value=None)
+        self.xuanzang.init_app(self.app_a,
+                               locale_selector=self.locale_selector_a)
 
         self.app_b = Flask(__name__)
         self.app_b.config['XUANZANG_DEFAULT_LOCALE'] = 'de'
-        self.xuanzang.init_app(self.app_b)
+        self.locale_selector_b = Mock(name='locale_selector_b',
+                                      return_value=None)
+        self.xuanzang.init_app(self.app_b,
+                               locale_selector=self.locale_selector_b)
 
-    def test_free_functions(self):
+
+class MultipleAppsFreeFunctionTestCase(MultipleAppsTestCase):
+    def test_gettext(self):
         with self.app_a.test_request_context():
             self.assertEqual(ugettext('Large'), 'Large')
         with self.app_b.test_request_context():
             self.assertEqual(ugettext('Large'), 'Groß')
 
-    def test_methods(self):
+    def test_locale_selector(self):
+        self.locale_selector_a.return_value = 'de'
+        self.locale_selector_b.return_value = 'zh_CN'
+
+        with self.app_a.test_request_context():
+            self.assertEqual(ugettext('Large'), 'Groß')
+        with self.app_b.test_request_context():
+            self.assertEqual(ugettext('Large'), '大型')
+
+
+class MultipleAppsMethodTestCase(MultipleAppsTestCase):
+    def test_gettext(self):
         with self.app_a.test_request_context():
             self.assertEqual(self.xuanzang.ugettext('Large'), 'Large')
         with self.app_b.test_request_context():
