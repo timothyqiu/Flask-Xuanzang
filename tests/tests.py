@@ -12,30 +12,41 @@ from mock import Mock
 
 from flask_xuanzang import Xuanzang
 from flask_xuanzang import gettext, ngettext
-from flask_xuanzang import ugettext, ungettext, pgettext, npgettext
+from flask_xuanzang import ugettext, ungettext
+from flask_xuanzang import pgettext, npgettext
+from flask_xuanzang import lazy_gettext, lazy_ngettext
+from flask_xuanzang import lazy_ugettext, lazy_ungettext
+from flask_xuanzang import lazy_pgettext, lazy_npgettext
 
 
 PY2 = (sys.version_info[0] == 2)
 
 
 class XuanzangTestCase(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         subprocess.check_call(['pybabel', '-q', 'compile', '-d',
                                os.path.join('tests', 'translations')])
 
 
 class SingleAppTestCase(XuanzangTestCase):
-    def setUp(self, default_locale='de', locale_selector=None):
+    def setUp(self, default_locale='de', with_locale_selector=True):
         super(SingleAppTestCase, self).setUp()
 
         self.app = Flask(__name__)
         self.app.config['XUANZANG_DEFAULT_LOCALE'] = default_locale
-        self.xuanzang = Xuanzang(self.app, locale_selector=locale_selector)
+
+        self.locale_selector = None
+        if with_locale_selector:
+            self.locale_selector = Mock(name='locale_selector',
+                                        return_value=None)
+        self.xuanzang = Xuanzang(self.app,
+                                 locale_selector=self.locale_selector)
 
 
 class GettextTestCase(SingleAppTestCase):
     def setUp(self):
-        super(GettextTestCase, self).setUp()
+        super(GettextTestCase, self).setUp(with_locale_selector=False)
 
     def test_gettext(self):
         with self.app.test_request_context():
@@ -82,10 +93,9 @@ class GettextTestCase(SingleAppTestCase):
 
 class LocaleSelectorTestCase(SingleAppTestCase):
     def setUp(self):
-        self.locale_selector = Mock(name='locale_selector')
         super(LocaleSelectorTestCase, self).setUp(
             default_locale='de',
-            locale_selector=self.locale_selector)
+            with_locale_selector=True)
 
     def test_return_none(self):
         self.locale_selector.return_value = None
@@ -100,11 +110,55 @@ class LocaleSelectorTestCase(SingleAppTestCase):
             self.locale_selector.assert_any_call()
 
 
-class MethodTestCase(SingleAppTestCase):
-    def setUp(self):
-        self.locale_selector = Mock(name='locale_selector')
-        super(MethodTestCase, self).setUp(locale_selector=self.locale_selector)
+class LazyGettextTestCase(SingleAppTestCase):
+    def test_not_lazy(self):
+        self.assertRaises(RuntimeError, gettext, 'Large')
 
+    def test_lazy_gettext(self):
+        message = lazy_gettext('Large')
+        with self.app.test_request_context():
+            if PY2:
+                self.assertEqual(message, 'Groß'.encode('utf-8'))
+            else:
+                self.assertEqual(message, 'Groß')
+
+    def test_lazy_ngettext(self):
+        singular = lazy_ngettext('%(num)s apple', '%(num)s apples', 1)
+        plural = lazy_ngettext('%(num)s apple', '%(num)s apples', 2)
+        with self.app.test_request_context():
+            if PY2:
+                self.assertEqual(singular, '1 Apfel'.encode('utf-8'))
+                self.assertEqual(plural, '2 Äpfel'.encode('utf-8'))
+            else:
+                self.assertEqual(singular, '1 Apfel')
+                self.assertEqual(plural, '2 Äpfel')
+
+    def test_lazy_ugettext(self):
+        message = lazy_ugettext('Large')
+        with self.app.test_request_context():
+            self.assertEqual(message, 'Groß')
+
+    def test_lazy_ungettext(self):
+        singular = lazy_ungettext('%(num)s apple', '%(num)s apples', 1)
+        plural = lazy_ungettext('%(num)s apple', '%(num)s apples', 2)
+        with self.app.test_request_context():
+            self.assertEqual(singular, '1 Apfel')
+            self.assertEqual(plural, '2 Äpfel')
+
+    def test_lazy_pgettext(self):
+        message = lazy_pgettext('month name', 'May')
+        with self.app.test_request_context():
+            self.assertEqual(message, 'Mai')
+
+    def test_lazy_npgettext(self):
+        singular = lazy_npgettext('fruits', 'apple', 'apples', 1)
+        plural = lazy_npgettext('fruits', 'apple', 'apples', 2)
+        with self.app.test_request_context():
+            self.assertEqual(singular, 'Apfel')
+            self.assertEqual(plural, 'Äpfel')
+
+
+class MethodTestCase(SingleAppTestCase):
     def test_gettext(self):
         self.locale_selector.return_value = None
         with self.app.test_request_context():
@@ -115,6 +169,56 @@ class MethodTestCase(SingleAppTestCase):
         with self.app.test_request_context():
             self.assertEqual(self.xuanzang.ugettext('Large'), '大型')
             self.locale_selector.assert_any_call()
+
+    def test_not_lazy(self):
+        self.assertRaises(RuntimeError, self.xuanzang.gettext, 'Large')
+
+    def test_lazy_gettext(self):
+        message = self.xuanzang.lazy_gettext('Large')
+        with self.app.test_request_context():
+            if PY2:
+                self.assertEqual(message, 'Groß'.encode('utf-8'))
+            else:
+                self.assertEqual(message, 'Groß')
+
+    def test_lazy_ngettext(self):
+        singular = self.xuanzang.lazy_ngettext('%(num)s apple',
+                                               '%(num)s apples', 1)
+        plural = self.xuanzang.lazy_ngettext('%(num)s apple',
+                                             '%(num)s apples', 2)
+        with self.app.test_request_context():
+            if PY2:
+                self.assertEqual(singular, '1 Apfel'.encode('utf-8'))
+                self.assertEqual(plural, '2 Äpfel'.encode('utf-8'))
+            else:
+                self.assertEqual(singular, '1 Apfel')
+                self.assertEqual(plural, '2 Äpfel')
+
+    def test_lazy_ugettext(self):
+        message = self.xuanzang.lazy_ugettext('Large')
+        with self.app.test_request_context():
+            self.assertEqual(message, 'Groß')
+
+    def test_lazy_ungettext(self):
+        singular = self.xuanzang.lazy_ungettext('%(num)s apple',
+                                                '%(num)s apples', 1)
+        plural = self.xuanzang.lazy_ungettext('%(num)s apple',
+                                              '%(num)s apples', 2)
+        with self.app.test_request_context():
+            self.assertEqual(singular, '1 Apfel')
+            self.assertEqual(plural, '2 Äpfel')
+
+    def test_lazy_pgettext(self):
+        message = self.xuanzang.lazy_pgettext('month name', 'May')
+        with self.app.test_request_context():
+            self.assertEqual(message, 'Mai')
+
+    def test_lazy_npgettext(self):
+        singular = self.xuanzang.lazy_npgettext('fruits', 'apple', 'apples', 1)
+        plural = self.xuanzang.lazy_npgettext('fruits', 'apple', 'apples', 2)
+        with self.app.test_request_context():
+            self.assertEqual(singular, 'Apfel')
+            self.assertEqual(plural, 'Äpfel')
 
 
 class MultipleAppsTestCase(XuanzangTestCase):

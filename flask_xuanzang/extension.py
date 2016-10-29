@@ -1,9 +1,10 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import functools
 import os
 
-from babel.support import Locale, Translations
+from babel.support import LazyProxy, Locale, Translations
 from flask import current_app
 
 
@@ -45,6 +46,33 @@ class ShoshinMixin(object):
         t = self.get_translations()
         s = t.ungettext(singular, plural, num)
         return s if not variables else s % variables
+
+    def lazy_gettext(self, message, **variables):
+        func = functools.partial(self.gettext, message, **variables)
+        return LazyProxy(func)
+
+    def lazy_ngettext(self, singular, plural, num, **variables):
+        func = functools.partial(self.ngettext,
+                                 singular, plural, num, **variables)
+        return LazyProxy(func)
+
+    def lazy_pgettext(self, context, message, **variables):
+        func = functools.partial(self.pgettext, context, message, **variables)
+        return LazyProxy(func)
+
+    def lazy_npgettext(self, context, singular, plural, num, **variables):
+        func = functools.partial(self.npgettext,
+                                 context, singular, plural, num, **variables)
+        return LazyProxy(func)
+
+    def lazy_ugettext(self, message, **variables):
+        func = functools.partial(self.ugettext, message, **variables)
+        return LazyProxy(func)
+
+    def lazy_ungettext(self, singular, plural, num, **variables):
+        func = functools.partial(self.ungettext,
+                                 singular, plural, num, **variables)
+        return LazyProxy(func)
 
 
 class Attan(ShoshinMixin):
@@ -109,9 +137,14 @@ class Xuanzang(ShoshinMixin):
         return self.get_attan().get_translations()
 
 
-def _do_translation(function_name, *args, **kwargs):
+def _translate(function_name, *args, **kwargs):
     attan = Xuanzang.get_attan()
     return getattr(attan, function_name)(*args, **kwargs)
+
+
+def _lazy_translate(function_name, *args, **kwargs):
+    func = functools.partial(_translate, function_name, *args, **kwargs)
+    return LazyProxy(func)
 
 
 def gettext(message, **variables):
@@ -119,7 +152,7 @@ def gettext(message, **variables):
 
     :returns: a string on Python 3 and an UTF-8-encoded bytestring on Python 2
     '''
-    return _do_translation('gettext', message, **variables)
+    return _translate('gettext', message, **variables)
 
 
 def ngettext(singular, plural, num, **variables):
@@ -128,21 +161,45 @@ def ngettext(singular, plural, num, **variables):
 
     :returns: a string on Python 3 and an UTF-8-encoded bytestring on Python 2
     '''
-    return _do_translation('ngettext', singular, plural, num, **variables)
+    return _translate('ngettext', singular, plural, num, **variables)
 
 
 def pgettext(context, message, **variables):
-    return _do_translation('pgettext', context, message, **variables)
+    return _translate('pgettext', context, message, **variables)
 
 
 def npgettext(context, singular, plural, num, **variables):
-    return _do_translation('npgettext',
-                           context, singular, plural, num, **variables)
+    return _translate('npgettext', context, singular, plural, num, **variables)
 
 
 def ugettext(message, **variables):
-    return _do_translation('ugettext', message, **variables)
+    return _translate('ugettext', message, **variables)
 
 
 def ungettext(singular, plural, num, **variables):
-    return _do_translation('ungettext', singular, plural, num, **variables)
+    return _translate('ungettext', singular, plural, num, **variables)
+
+
+def lazy_gettext(message, **variables):
+    return _lazy_translate('gettext', message, **variables)
+
+
+def lazy_ngettext(singular, plural, num, **variables):
+    return _lazy_translate('ngettext', singular, plural, num, **variables)
+
+
+def lazy_pgettext(context, message, **variables):
+    return _lazy_translate('pgettext', context, message, **variables)
+
+
+def lazy_npgettext(context, singular, plural, num, **variables):
+    return _lazy_translate('npgettext',
+                           context, singular, plural, num, **variables)
+
+
+def lazy_ugettext(message, **variables):
+    return _lazy_translate('ugettext', message, **variables)
+
+
+def lazy_ungettext(singular, plural, num, **variables):
+    return _lazy_translate('ungettext', singular, plural, num, **variables)
