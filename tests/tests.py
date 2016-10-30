@@ -109,6 +109,14 @@ class LocaleSelectorTestCase(SingleAppTestCase):
             self.assertEqual(ugettext('Large'), '大型')
             self.locale_selector.assert_any_call()
 
+    def test_no_cache(self):
+        with self.app.test_request_context():
+            self.locale_selector.return_value = 'zh_CN'
+            self.assertEqual(ugettext('Large'), '大型')
+
+            self.locale_selector.return_value = 'de'
+            self.assertEqual(ugettext('Large'), 'Groß')
+
 
 class LazyGettextTestCase(SingleAppTestCase):
     def test_not_lazy(self):
@@ -156,6 +164,15 @@ class LazyGettextTestCase(SingleAppTestCase):
         with self.app.test_request_context():
             self.assertEqual(singular, 'Apfel')
             self.assertEqual(plural, 'Äpfel')
+
+    def test_no_cache(self):
+        message = lazy_ugettext('Large')
+        with self.app.test_request_context():
+            self.locale_selector.return_value = 'zh_CN'
+            self.assertEqual(message, '大型')
+
+            self.locale_selector.return_value = 'de'
+            self.assertEqual(message, 'Groß')
 
 
 class MethodTestCase(SingleAppTestCase):

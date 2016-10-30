@@ -49,30 +49,30 @@ class ShoshinMixin(object):
 
     def lazy_gettext(self, message, **variables):
         func = functools.partial(self.gettext, message, **variables)
-        return LazyProxy(func)
+        return LazyProxy(func, enable_cache=False)
 
     def lazy_ngettext(self, singular, plural, num, **variables):
         func = functools.partial(self.ngettext,
                                  singular, plural, num, **variables)
-        return LazyProxy(func)
+        return LazyProxy(func, enable_cache=False)
 
     def lazy_pgettext(self, context, message, **variables):
         func = functools.partial(self.pgettext, context, message, **variables)
-        return LazyProxy(func)
+        return LazyProxy(func, enable_cache=False)
 
     def lazy_npgettext(self, context, singular, plural, num, **variables):
         func = functools.partial(self.npgettext,
                                  context, singular, plural, num, **variables)
-        return LazyProxy(func)
+        return LazyProxy(func, enable_cache=False)
 
     def lazy_ugettext(self, message, **variables):
         func = functools.partial(self.ugettext, message, **variables)
-        return LazyProxy(func)
+        return LazyProxy(func, enable_cache=False)
 
     def lazy_ungettext(self, singular, plural, num, **variables):
         func = functools.partial(self.ungettext,
                                  singular, plural, num, **variables)
-        return LazyProxy(func)
+        return LazyProxy(func, enable_cache=False)
 
 
 class Attan(ShoshinMixin):
@@ -144,7 +144,7 @@ def _translate(function_name, *args, **kwargs):
 
 def _lazy_translate(function_name, *args, **kwargs):
     func = functools.partial(_translate, function_name, *args, **kwargs)
-    return LazyProxy(func)
+    return LazyProxy(func, enable_cache=False)
 
 
 def gettext(message, **variables):
