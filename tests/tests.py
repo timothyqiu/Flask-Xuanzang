@@ -109,14 +109,6 @@ class LocaleSelectorTestCase(SingleAppTestCase):
             self.assertEqual(ugettext('Large'), '大型')
             self.locale_selector.assert_any_call()
 
-    def test_no_cache(self):
-        with self.app.test_request_context():
-            self.locale_selector.return_value = 'zh_CN'
-            self.assertEqual(ugettext('Large'), '大型')
-
-            self.locale_selector.return_value = 'de'
-            self.assertEqual(ugettext('Large'), 'Groß')
-
 
 class LazyGettextTestCase(SingleAppTestCase):
     def test_not_lazy(self):
@@ -165,14 +157,53 @@ class LazyGettextTestCase(SingleAppTestCase):
             self.assertEqual(singular, 'Apfel')
             self.assertEqual(plural, 'Äpfel')
 
-    def test_no_cache(self):
+
+class GettextLocaleCacheTestCase(SingleAppTestCase):
+    def test_cache(self):
+        with self.app.test_request_context():
+            ugettext('Large')
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+            ungettext('%(num)s apple', '%(num)s apples', 1)
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+    def test_refresh(self):
+        with self.app.test_request_context():
+            ugettext('Large')
+            self.xuanzang.refresh()
+            ungettext('%(num)s apple', '%(num)s apples', 1)
+            self.assertEqual(self.locale_selector.call_count, 2)
+
+    def test_no_cache_between_requests(self):
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(self.locale_selector.call_count, 1)
+
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(self.locale_selector.call_count, 2)
+
+
+class LazyGettextLocaleCacheTestCase(SingleAppTestCase):
+    def test_cache(self):
         message = lazy_ugettext('Large')
         with self.app.test_request_context():
-            self.locale_selector.return_value = 'zh_CN'
-            self.assertEqual(message, '大型')
+            len(message)  # Triggers loading
+            self.assertEqual(self.locale_selector.call_count, 1)
 
-            self.locale_selector.return_value = 'de'
-            self.assertEqual(message, 'Groß')
+            len(message)  # Triggers loading
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+    def test_refresh_cache(self):
+        message = lazy_ugettext('Large')
+        with self.app.test_request_context():
+            len(message)  # Triggers loading
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+            self.xuanzang.refresh()
+
+            len(message)  # Triggers loading
+            self.assertEqual(self.locale_selector.call_count, 2)
 
 
 class MethodTestCase(SingleAppTestCase):
