@@ -84,6 +84,7 @@ class Attan(ShoshinMixin):
         self.translation_directory = translation_directory
         self.default_locale = Locale.parse(default_locale)
         self.locale_selector = locale_selector
+        self.translation_cache = {}
 
     def _get_cache_object(self):
         context = _app_ctx_stack.top
@@ -99,6 +100,19 @@ class Attan(ShoshinMixin):
             return self.default_locale
         return Locale.parse(raw_locale)
 
+    def _load_translations(self, locale):
+        directory = self.translation_directory
+        translations = Translations.load(directory, [locale])
+        translations.set_output_charset('utf-8')
+        return translations
+
+    def load_translations(self, locale):
+        translations = self.translation_cache.get(locale)
+        if not translations:
+            translations = self._load_translations(locale)
+            self.translation_cache[locale] = translations
+        return translations
+
     def get_locale(self):
         obj = self._get_cache_object()
         locale = getattr(obj, self.LOCALE_CACHE_KEY, None)
@@ -108,16 +122,16 @@ class Attan(ShoshinMixin):
         return locale
 
     def get_translations(self):
-        directory = self.translation_directory
-        locales = [self.get_locale()]
-        translations = Translations.load(directory, locales)
-        translations.set_output_charset('utf-8')
-        return translations
+        locale = self.get_locale()
+        return self.load_translations(locale)
 
     def refresh(self):
         obj = self._get_cache_object()
         if hasattr(obj, self.LOCALE_CACHE_KEY):
             delattr(obj, self.LOCALE_CACHE_KEY)
+
+    def refresh_translations(self):
+        self.translation_cache = {}
 
 
 class Xuanzang(ShoshinMixin):
@@ -160,6 +174,9 @@ class Xuanzang(ShoshinMixin):
 
     def refresh(self):
         return self.get_attan().refresh()
+
+    def refresh_translations(self):
+        return self.get_attan().refresh_translations()
 
 
 def _translate(function_name, *args, **kwargs):
