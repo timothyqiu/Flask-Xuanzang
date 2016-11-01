@@ -1,0 +1,41 @@
+# German translations for PROJECT.
+# Copyright (C) 2016 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+# This file is encoded in ISO-8859-1 instead of UTF-8 to fail a test when
+# gettext / ugettext is not implemented properly.
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2016-10-28 14:08+0800\n"
+"PO-Revision-Date: 2016-10-28 14:09+0800\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=iso-8859-1\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.3.4\n"
+
+msgid "Large"
+msgstr "Groß"
+
+#, python-format
+msgid "%(num)s apple"
+msgid_plural "%(num)s apples"
+msgstr[0] "%(num)s Apfel"
+msgstr[1] "%(num)s Äpfel"
+
+msgctxt "month name"
+msgid "May"
+msgstr "Mai"
+
+msgctxt "fruits"
+msgid "apple"
+msgid_plural "apples"
+msgstr[0] "Apfel"
+msgstr[1] "Äpfel"
+

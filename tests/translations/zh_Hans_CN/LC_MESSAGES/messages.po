@@ -1,0 +1,37 @@
+# Chinese (Simplified, China) translations for PROJECT.
+# Copyright (C) 2016 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2016.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2016-10-28 14:08+0800\n"
+"PO-Revision-Date: 2016-10-29 09:39+0800\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: zh_Hans_CN\n"
+"Language-Team: zh_Hans_CN <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.3.4\n"
+
+msgid "Large"
+msgstr "大型"
+
+#, python-format
+msgid "%(num)s apple"
+msgid_plural "%(num)s apples"
+msgstr[0] "%(num)s 个苹果"
+
+msgctxt "month name"
+msgid "May"
+msgstr "五月"
+
+msgctxt "fruits"
+msgid "apple"
+msgid_plural "apples"
+msgstr[0] "苹果"
+
