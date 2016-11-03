@@ -2,13 +2,9 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import os
-import subprocess
 import sys
-import unittest
 
-from babel.support import NullTranslations
-from flask import Flask
+from babel.support import Locale
 from mock import Mock, patch
 
 from flask_xuanzang import Xuanzang
@@ -19,35 +15,24 @@ from flask_xuanzang import lazy_gettext, lazy_ngettext
 from flask_xuanzang import lazy_ugettext, lazy_ungettext
 from flask_xuanzang import lazy_pgettext, lazy_npgettext
 
+from tests import XuanzangTestCase
+
 
 PY2 = (sys.version_info[0] == 2)
 
 
-class XuanzangTestCase(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        subprocess.check_call(['pybabel', '-q', 'compile', '-d',
-                               os.path.join('tests', 'translations')])
+class GettextTestCase(XuanzangTestCase):
+    DEFAULT_LOCALE = None
 
-
-class SingleAppTestCase(XuanzangTestCase):
-    def setUp(self, default_locale='de', with_locale_selector=True):
-        super(SingleAppTestCase, self).setUp()
-
-        self.app = Flask(__name__)
-        self.app.config['XUANZANG_DEFAULT_LOCALE'] = default_locale
-
-        self.locale_selector = None
-        if with_locale_selector:
-            self.locale_selector = Mock(name='locale_selector',
-                                        return_value=None)
+    def setUp(self):
+        self.app = self.create_app(self.DEFAULT_LOCALE)
+        self.locale_selector = Mock(name='locale_selector', return_value=None)
         self.xuanzang = Xuanzang(self.app,
                                  locale_selector=self.locale_selector)
 
 
-class GettextTestCase(SingleAppTestCase):
-    def setUp(self):
-        super(GettextTestCase, self).setUp(with_locale_selector=False)
+class GettextFunctionTestCase(GettextTestCase):
+    DEFAULT_LOCALE = 'de'
 
     def test_gettext(self):
         with self.app.test_request_context():
@@ -92,27 +77,165 @@ class GettextTestCase(SingleAppTestCase):
             self.assertEqual(plural, 'Äpfel')
 
 
-class LocaleSelectorTestCase(SingleAppTestCase):
-    def setUp(self):
-        super(LocaleSelectorTestCase, self).setUp(
-            default_locale='de',
-            with_locale_selector=True)
+class LocaleSelectorTestCase(GettextTestCase):
+    DEFAULT_LOCALE = 'de'
 
     def test_return_none(self):
+        # Returning None selects the default locale
         self.locale_selector.return_value = None
         with self.app.test_request_context():
             self.assertEqual(ugettext('Large'), 'Groß')
             self.locale_selector.assert_any_call()
 
     def test_return_locale(self):
+        # Returning Locale selects that locale
+        self.locale_selector.return_value = Locale.parse('zh_CN')
+        with self.app.test_request_context():
+            self.assertEqual(ugettext('Large'), '大型')
+            self.locale_selector.assert_any_call()
+
+    def test_return_text(self):
+        # Returning text selects locale denoted by the text
         self.locale_selector.return_value = 'zh_CN'
         with self.app.test_request_context():
             self.assertEqual(ugettext('Large'), '大型')
             self.locale_selector.assert_any_call()
 
+    def test_cache_in_request(self):
+        # Result of locale selector is cached within the request by default
+        with self.app.test_request_context():
+            ugettext('Large')
+            self.assertEqual(self.locale_selector.call_count, 1)
 
-class LazyGettextTestCase(SingleAppTestCase):
+            ungettext('%(num)s apple', '%(num)s apples', 1)
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+            ugettext('Large')
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+    def test_no_cache_between_requests(self):
+        # Result of locale selector is not cached between requests
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(self.locale_selector.call_count, 1)
+
+        with self.app.test_request_context():
+            ungettext('%(num)s apple', '%(num)s apples', 1)
+        self.assertEqual(self.locale_selector.call_count, 2)
+
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(self.locale_selector.call_count, 3)
+
+    def test_refresh(self):
+        # Calling refresh() clears the cache
+        with self.app.test_request_context():
+            ugettext('Large')
+            self.assertEqual(self.locale_selector.call_count, 1)
+
+            self.xuanzang.refresh()
+            ungettext('%(num)s apple', '%(num)s apples', 1)
+            self.assertEqual(self.locale_selector.call_count, 2)
+
+            self.xuanzang.refresh()
+            ugettext('Large')
+            self.assertEqual(self.locale_selector.call_count, 3)
+
+
+@patch('babel.support.Translations.load')
+class GetTranslationCacheTestCase(GettextTestCase):
+    DEFAULT_LOCALE = 'de'
+
+    def test_cache(self, mock_load):
+        # Translation loading is cached for the each locale
+        with self.app.test_request_context():
+            # The cache is empty, always load from disk
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 1)
+
+            # Locale is not changed, load from cache
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 1)
+
+            # The new locale is not cached
+            self.xuanzang.refresh()  # Clears locale selector cache
+            self.locale_selector.return_value = 'zh_CN'
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 2)
+
+            # The previous locale is still cached
+            self.xuanzang.refresh()  # Clears locale selector cache
+            self.locale_selector.return_value = 'de'
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 2)
+
+            # The new locale is still cached
+            self.xuanzang.refresh()  # Clears locale selector cache
+            self.locale_selector.return_value = 'zh_CN'
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 2)
+
+    def test_cache_between_requests(self, mock_load):
+        # Translation loading is cached across requests
+        # Requests have no means to affect translations for a specified locale
+
+        # The cache is empty, always load from disk
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 1)
+
+        # Locale is not changed, load form cache
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 1)
+
+        # The new locale is not cached
+        with self.app.test_request_context():
+            self.locale_selector.return_value = 'zh_CN'
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 2)
+
+        # The previous locale is still cached
+        with self.app.test_request_context():
+            self.locale_selector.return_value = 'de'
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 2)
+
+        # The new locale is still cached
+        with self.app.test_request_context():
+            self.locale_selector.return_value = 'zh_CN'
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 2)
+
+    def test_clear_cache_in_request(self, mock_load):
+        # refresh_translations() clears translation cache in request
+        with self.app.test_request_context():
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 1)
+
+            self.xuanzang.refresh_translations()
+
+            ugettext('Large')
+            self.assertEqual(mock_load.call_count, 2)
+
+    def test_clear_cache_between_requests(self, mock_load):
+        # refresh_translations() clears translation cache between requests
+
+        with self.app.test_request_context():
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 1)
+
+        with self.app.test_request_context():
+            self.xuanzang.refresh_translations()  # Application Context needed
+            ugettext('Large')
+        self.assertEqual(mock_load.call_count, 2)
+
+
+class LazyGettextTestCase(GettextTestCase):
+    DEFAULT_LOCALE = 'de'
+
     def test_not_lazy(self):
+        # not-lazy gettext should be called inside application context
         self.assertRaises(RuntimeError, gettext, 'Large')
 
     def test_lazy_gettext(self):
@@ -159,151 +282,33 @@ class LazyGettextTestCase(SingleAppTestCase):
             self.assertEqual(plural, 'Äpfel')
 
 
-class GettextLocaleCacheTestCase(SingleAppTestCase):
-    def test_cache(self):
-        with self.app.test_request_context():
-            ugettext('Large')
-            self.assertEqual(self.locale_selector.call_count, 1)
+class LazyGettextLocaleCacheTestCase(GettextTestCase):
+    DEFAULT_LOCALE = 'de'
 
-            ungettext('%(num)s apple', '%(num)s apples', 1)
-            self.assertEqual(self.locale_selector.call_count, 1)
-
-    def test_refresh(self):
-        with self.app.test_request_context():
-            ugettext('Large')
-            self.xuanzang.refresh()
-            ungettext('%(num)s apple', '%(num)s apples', 1)
-            self.assertEqual(self.locale_selector.call_count, 2)
-
-    def test_no_cache_between_requests(self):
-        with self.app.test_request_context():
-            ugettext('Large')
-        self.assertEqual(self.locale_selector.call_count, 1)
-
-        with self.app.test_request_context():
-            ugettext('Large')
-        self.assertEqual(self.locale_selector.call_count, 2)
-
-
-class LazyGettextLocaleCacheTestCase(SingleAppTestCase):
     def test_cache(self):
         message = lazy_ugettext('Large')
         with self.app.test_request_context():
-            len(message)  # Triggers loading
+            len(message)  # Triggers ugettext
             self.assertEqual(self.locale_selector.call_count, 1)
 
-            len(message)  # Triggers loading
+            len(message)  # Triggers ugettext
             self.assertEqual(self.locale_selector.call_count, 1)
 
     def test_refresh_cache(self):
         message = lazy_ugettext('Large')
         with self.app.test_request_context():
-            len(message)  # Triggers loading
+            len(message)  # Triggers ugettext
             self.assertEqual(self.locale_selector.call_count, 1)
 
             self.xuanzang.refresh()
 
-            len(message)  # Triggers loading
+            len(message)  # Triggers ugettext
             self.assertEqual(self.locale_selector.call_count, 2)
 
 
-@patch('babel.support.Translations.load')
-class GetTranslationCacheTestCase(SingleAppTestCase):
-    def test_cache_in_request(self, mock_load):
-        with self.app.test_request_context():
-            # cache: []
-            self.locale_selector.return_value = 'zh_CN'
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 1)
+class MethodTestCase(GettextTestCase):
+    DEFAULT_LOCALE = 'de'
 
-            # cache: [zh_CN]
-            self.xuanzang.refresh()  # Xuanzang caches locale_selector result
-            self.locale_selector.return_value = 'zh_CN'
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 1)
-
-            # cache: [zh_CN]
-            self.xuanzang.refresh()  # Xuanzang caches locale_selector result
-            self.locale_selector.return_value = 'de'
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 2)
-
-            # cache: [zh_CN, de]
-            self.xuanzang.refresh()  # Xuanzang caches locale_selector result
-            self.locale_selector.return_value = 'zh_CN'
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 2)
-
-            # cache: [zh_CN, de]
-            self.xuanzang.refresh()  # Xuanzang caches locale_selector result
-            self.locale_selector.return_value = 'de'
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 2)
-
-    def test_cache_between_requests(self, mock_load):
-        # cache: []
-        with self.app.test_request_context():
-            self.locale_selector.return_value = 'zh_CN'
-            ugettext('Large')
-        self.assertEqual(mock_load.call_count, 1)
-
-        # cache: [zh_CN]
-        with self.app.test_request_context():
-            self.locale_selector.return_value = 'zh_CN'
-            ugettext('Large')
-        self.assertEqual(mock_load.call_count, 1)
-
-        # cache: [zh_CN]
-        with self.app.test_request_context():
-            self.locale_selector.return_value = 'de'
-            ugettext('Large')
-        self.assertEqual(mock_load.call_count, 2)
-
-        # cache: [zh_CN, de]
-        with self.app.test_request_context():
-            self.locale_selector.return_value = 'zh_CN'
-            ugettext('Large')
-        self.assertEqual(mock_load.call_count, 2)
-
-        # cache: [zh_CN, de]
-        with self.app.test_request_context():
-            self.locale_selector.return_value = 'de'
-            ugettext('Large')
-        self.assertEqual(mock_load.call_count, 2)
-
-    def test_clear_cache_in_request(self, mock_load):
-        with self.app.test_request_context():
-            # cache: []
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 1)
-            # cache: [zh_CN]
-
-            # Clears translation cache
-            self.xuanzang.refresh_translations()
-
-            # cache: []
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 2)
-            # cache: [zh_CN]
-
-    def test_clear_cache_between_requests(self, mock_load):
-        with self.app.test_request_context():
-            # cache: []
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 1)
-            # cache: [zh_CN]
-
-        with self.app.test_request_context():
-            # Clears translation cache
-            self.xuanzang.refresh_translations()
-
-            # cache: []
-            ugettext('Large')
-            self.assertEqual(mock_load.call_count, 2)
-            # cache: [zh_CN]
-
-
-class MethodTestCase(SingleAppTestCase):
     def test_gettext(self):
         self.locale_selector.return_value = None
         with self.app.test_request_context():
@@ -364,49 +369,3 @@ class MethodTestCase(SingleAppTestCase):
         with self.app.test_request_context():
             self.assertEqual(singular, 'Apfel')
             self.assertEqual(plural, 'Äpfel')
-
-
-class MultipleAppsTestCase(XuanzangTestCase):
-    def setUp(self):
-        super(MultipleAppsTestCase, self).setUp()
-
-        self.xuanzang = Xuanzang()
-
-        self.app_a = Flask(__name__)
-        self.app_a.config['XUANZANG_DEFAULT_LOCALE'] = 'en'
-        self.locale_selector_a = Mock(name='locale_selector_a',
-                                      return_value=None)
-        self.xuanzang.init_app(self.app_a,
-                               locale_selector=self.locale_selector_a)
-
-        self.app_b = Flask(__name__)
-        self.app_b.config['XUANZANG_DEFAULT_LOCALE'] = 'de'
-        self.locale_selector_b = Mock(name='locale_selector_b',
-                                      return_value=None)
-        self.xuanzang.init_app(self.app_b,
-                               locale_selector=self.locale_selector_b)
-
-
-class MultipleAppsFreeFunctionTestCase(MultipleAppsTestCase):
-    def test_gettext(self):
-        with self.app_a.test_request_context():
-            self.assertEqual(ugettext('Large'), 'Large')
-        with self.app_b.test_request_context():
-            self.assertEqual(ugettext('Large'), 'Groß')
-
-    def test_locale_selector(self):
-        self.locale_selector_a.return_value = 'de'
-        self.locale_selector_b.return_value = 'zh_CN'
-
-        with self.app_a.test_request_context():
-            self.assertEqual(ugettext('Large'), 'Groß')
-        with self.app_b.test_request_context():
-            self.assertEqual(ugettext('Large'), '大型')
-
-
-class MultipleAppsMethodTestCase(MultipleAppsTestCase):
-    def test_gettext(self):
-        with self.app_a.test_request_context():
-            self.assertEqual(self.xuanzang.ugettext('Large'), 'Large')
-        with self.app_b.test_request_context():
-            self.assertEqual(self.xuanzang.ugettext('Large'), 'Groß')
