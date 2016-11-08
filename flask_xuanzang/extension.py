@@ -135,6 +135,13 @@ class Attan(ShoshinMixin):
 
 
 class Xuanzang(ShoshinMixin):
+    """Central controller class that can be used to configure how
+    Flask-Xuanzang behaves.
+
+    :param app: Flask instance
+    :param locale_selector: A callback function for locale selection
+    """
+
     EXTENSION_KEY = 'xuanzang'
 
     def __init__(self, app=None, locale_selector=None):
@@ -144,6 +151,7 @@ class Xuanzang(ShoshinMixin):
             self.init_app(app, locale_selector=locale_selector)
 
     def init_app(self, app, locale_selector=None):
+        """Initialzes an application for the use with this setup."""
         locale_selector = locale_selector or self.locale_selector
         attan = self.init_attan(app, locale_selector)
 
@@ -173,9 +181,11 @@ class Xuanzang(ShoshinMixin):
         return self.get_attan().get_translations()
 
     def refresh(self):
+        """Refreshes the cached locale information."""
         return self.get_attan().refresh()
 
     def refresh_translations(self):
+        """Refreshes the cached translations."""
         return self.get_attan().refresh_translations()
 
 
@@ -190,58 +200,84 @@ def _lazy_translate(function_name, *args, **kwargs):
 
 
 def gettext(message, **variables):
-    '''Returns a string of the translation of the message.
+    """Translates `message` and returns it in a UTF-8 bytestring.
 
     :returns: a string on Python 3 and an UTF-8-encoded bytestring on Python 2
-    '''
+    """
     return _translate('gettext', message, **variables)
 
 
 def ngettext(singular, plural, num, **variables):
-    '''Returns a string of the translation of the singular or plural based on
-    the number.
+    """Translates `singular` and `plural` and returns the appropriate string
+    based on `number` in a UTF-8 bytestring.
 
     :returns: a string on Python 3 and an UTF-8-encoded bytestring on Python 2
-    '''
+    """
     return _translate('ngettext', singular, plural, num, **variables)
 
 
 def pgettext(context, message, **variables):
+    """Translates `message` given the `context`"""
     return _translate('pgettext', context, message, **variables)
 
 
 def npgettext(context, singular, plural, num, **variables):
+    """Translates `singular` and `plural` and returns the appropriate string
+    based on `number` and `context`.
+    """
     return _translate('npgettext', context, singular, plural, num, **variables)
 
 
 def ugettext(message, **variables):
+    """Translates `message`."""
     return _translate('ugettext', message, **variables)
 
 
 def ungettext(singular, plural, num, **variables):
+    """Translates `singular` and `plural` and returns the appropriate string
+    based on `number`.
+    """
     return _translate('ungettext', singular, plural, num, **variables)
 
 
 def lazy_gettext(message, **variables):
+    """Like :func:`gettext` but the string returned is lazy. The translation
+    happens when it is used as an actual string.
+    """
     return _lazy_translate('gettext', message, **variables)
 
 
 def lazy_ngettext(singular, plural, num, **variables):
+    """Like :func:`ngettext` but the string returned is lazy. The translation
+    happens when it is used as an actual string.
+    """
     return _lazy_translate('ngettext', singular, plural, num, **variables)
 
 
 def lazy_pgettext(context, message, **variables):
+    """Like :func:`pgettext` but the string returned is lazy. The translation
+    happens when it is used as an actual string.
+    """
     return _lazy_translate('pgettext', context, message, **variables)
 
 
 def lazy_npgettext(context, singular, plural, num, **variables):
+    """Like :func:`npgettext` but the string returned is lazy. The translation
+    happens when it is used as an actual string.
+    """
     return _lazy_translate('npgettext',
                            context, singular, plural, num, **variables)
 
 
 def lazy_ugettext(message, **variables):
+    """Like :func:`ugettext` but the string returned is lazy. The translation
+    happens when it is used as an actual string.
+    """
     return _lazy_translate('ugettext', message, **variables)
 
 
 def lazy_ungettext(singular, plural, num, **variables):
+    """Like :func:`ungettext` but the string returned is lazy. The translation
+    happens when it is used as an actual string.
+    """
     return _lazy_translate('ungettext', singular, plural, num, **variables)
