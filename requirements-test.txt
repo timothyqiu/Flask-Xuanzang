@@ -1,0 +1,4 @@
+--requirement requirements.txt
+
+nose
+mock
