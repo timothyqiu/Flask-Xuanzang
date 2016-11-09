@@ -51,6 +51,17 @@ Gettext Functions
 .. autofunction:: lazy_npgettext
 
 
+Number Functions
+````````````````
+.. autofunction:: format_decimal
+.. autofunction:: parse_decimal
+
+
+Exceptions
+``````````
+.. autoexception:: NumberFormatError
+
+
 Legacy Gettext Functions
 ````````````````````````
 .. autofunction:: gettext
