@@ -4,9 +4,15 @@ from __future__ import unicode_literals
 import functools
 import os
 
+from babel import numbers
 from babel.support import LazyProxy, Locale, Translations
 from flask import current_app
 from flask import _app_ctx_stack
+
+
+class NumberFormatError(ValueError):
+    """Exception raised when a string cannot be parsed into a number."""
+    pass
 
 
 class ShoshinMixin(object):
@@ -74,6 +80,18 @@ class ShoshinMixin(object):
         func = functools.partial(self.ungettext,
                                  singular, plural, num, **variables)
         return LazyProxy(func, enable_cache=False)
+
+    def format_decimal(self, number):
+        locale = self.get_locale()
+        return numbers.format_decimal(number, locale=locale)
+
+    def parse_decimal(self, string):
+        locale = self.get_locale()
+        try:
+            return numbers.parse_decimal(string, locale=locale)
+        except numbers.NumberFormatError:
+            message = '{0!r} is not a valid number'.format(string)
+            raise NumberFormatError(message)
 
 
 class Attan(ShoshinMixin):
@@ -281,3 +299,19 @@ def lazy_ungettext(singular, plural, num, **variables):
     happens when it is used as an actual string.
     """
     return _lazy_translate('ungettext', singular, plural, num, **variables)
+
+
+def format_decimal(number):
+    """Formats `number` for current locale."""
+    attan = Xuanzang.get_attan()
+    return attan.format_decimal(number)
+
+
+def parse_decimal(string):
+    """Parses localized `string` into a decimal.
+
+    :returns: the parsed number as ``decimal.Decimal``
+    :raises NumberFormatError: if the string can not be converted to a number
+    """
+    attan = Xuanzang.get_attan()
+    return attan.parse_decimal(string)
